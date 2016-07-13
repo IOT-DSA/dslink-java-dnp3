@@ -1,5 +1,8 @@
 package dnp3;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import org.dsa.iot.dslink.node.Node;
 import org.dsa.iot.dslink.node.Permission;
 import org.dsa.iot.dslink.node.actions.Action;
@@ -13,6 +16,10 @@ import org.dsa.iot.dslink.util.handler.Handler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.serotonin.io.serial.CommPortConfigException;
+import com.serotonin.io.serial.CommPortProxy;
+import com.serotonin.io.serial.SerialUtils;
+
 public class DnpLink {
 	
 	private static final Logger LOGGER = LoggerFactory.getLogger(DnpLink.class);
@@ -20,6 +27,7 @@ public class DnpLink {
 	private Node node;
 	Serializer copySerializer;
 	Deserializer copyDeserializer;
+	Set<DnpOutstation> serialOutstations = new HashSet<DnpOutstation>();
 	
 	private DnpLink(Node node, Serializer copyser, Deserializer copydeser) {
 		this.node = node;
@@ -35,36 +43,9 @@ public class DnpLink {
 	private void init() {
 		restoreLastSession();
 		
-		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
-			public void handle(ActionResult event) {
-				addOutstation(event);
-			}
-		});
-		act.addParameter(new Parameter("Name", ValueType.STRING));
-		act.addParameter(new Parameter("Host", ValueType.STRING, new Value("0.0.0.0")));
-		act.addParameter(new Parameter("Port", ValueType.NUMBER, new Value(20000)));
-		act.addParameter(new Parameter("Master Address", ValueType.NUMBER, new Value(17)));
-		act.addParameter(new Parameter("Outstation Address", ValueType.NUMBER, new Value(4)));
-		act.addParameter(new Parameter("Event Polling Interval", ValueType.NUMBER, new Value(5)));
-		act.addParameter(new Parameter("Static Polling Interval", ValueType.NUMBER, new Value(25)));
-		node.createChild("add ip outstation").setAction(act).build().setSerializable(false);
-	
-		act = new Action(Permission.READ, new Handler<ActionResult>() {
-			public void handle(ActionResult event) {
-				addOutstation(event);
-			}
-		});
-		act.addParameter(new Parameter("Name", ValueType.STRING));
-		act.addParameter(new Parameter("COM Port", ValueType.STRING, new Value("COM3")));
-		act.addParameter(new Parameter("Baud Rate", ValueType.NUMBER, new Value(9600)));
-		act.addParameter(new Parameter("Data Bits", ValueType.NUMBER, new Value(8)));
-		act.addParameter(new Parameter("Stop Bits", ValueType.NUMBER, new Value(1)));
-		act.addParameter(new Parameter("Parity", ValueType.NUMBER, new Value(0)));
-		act.addParameter(new Parameter("Master Address", ValueType.NUMBER, new Value(17)));
-		act.addParameter(new Parameter("Outstation Address", ValueType.NUMBER, new Value(4)));
-		act.addParameter(new Parameter("Event Polling Interval", ValueType.NUMBER, new Value(5)));
-		act.addParameter(new Parameter("Static Polling Interval", ValueType.NUMBER, new Value(25)));
-		node.createChild("add serial outstation").setAction(act).build().setSerializable(false);
+		makeAddOutstationAction(false);
+		makeAddOutstationAction(true);
+		makePortScanAction();
 	}
 	
 	private void restoreLastSession() {
@@ -104,6 +85,85 @@ public class DnpLink {
 		if (val == null) n.setAttribute(attributeName,  defaultValue);
 	}
 	
+	private void makePortScanAction() {
+		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+			public void handle(ActionResult event) {
+				doPortScan();
+			}
+		});
+		node.createChild("scan for serial ports").setAction(act).build().setSerializable(false);
+	}
+	
+	private void doPortScan() {
+		makeAddOutstationAction(true);
+		
+		for (DnpOutstation serDo: serialOutstations) {
+			serDo.makeEditAction();
+		}
+	}
+	
+	public Set<String> getCOMPorts() {
+		Set<String> ports = new HashSet<String>();
+		try {
+			for (CommPortProxy p: SerialUtils.getCommPorts()) {
+				ports.add(p.getId());
+			}
+		} catch (CommPortConfigException e) {
+			LOGGER.debug("" ,e);
+		}
+		return ports;
+	}
+	
+	private void makeAddOutstationAction(boolean serial) {
+		if (serial) {
+			Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+				public void handle(ActionResult event) {
+					addOutstation(event);
+				}
+			});
+			act.addParameter(new Parameter("Name", ValueType.STRING));
+			
+			Set<String> portids = getCOMPorts();
+			if (portids.size() > 0) {
+				act.addParameter(new Parameter("COM Port", ValueType.makeEnum(portids)));
+				act.addParameter(new Parameter("COM Port (manual entry)", ValueType.STRING));
+			} else {
+				act.addParameter(new Parameter("COM Port", ValueType.STRING));
+			}
+			
+			act.addParameter(new Parameter("Baud Rate", ValueType.NUMBER, new Value(9600)));
+			act.addParameter(new Parameter("Data Bits", ValueType.NUMBER, new Value(8)));
+			act.addParameter(new Parameter("Stop Bits", ValueType.NUMBER, new Value(1)));
+			act.addParameter(new Parameter("Parity", ValueType.NUMBER, new Value(0)));
+			act.addParameter(new Parameter("Master Address", ValueType.NUMBER, new Value(17)));
+			act.addParameter(new Parameter("Outstation Address", ValueType.NUMBER, new Value(4)));
+			act.addParameter(new Parameter("Event Polling Interval", ValueType.NUMBER, new Value(5)));
+			act.addParameter(new Parameter("Static Polling Interval", ValueType.NUMBER, new Value(25)));
+			
+			Node anode = node.getChild("add serial outstation");
+			if (anode == null) node.createChild("add serial outstation").setAction(act).build().setSerializable(false);
+			else anode.setAction(act);
+		} else {
+			Action act = new Action(Permission.READ, new Handler<ActionResult>() {
+				public void handle(ActionResult event) {
+					addOutstation(event);
+				}
+			});
+			act.addParameter(new Parameter("Name", ValueType.STRING));
+			act.addParameter(new Parameter("Host", ValueType.STRING, new Value("0.0.0.0")));
+			act.addParameter(new Parameter("Port", ValueType.NUMBER, new Value(20000)));
+			act.addParameter(new Parameter("Master Address", ValueType.NUMBER, new Value(17)));
+			act.addParameter(new Parameter("Outstation Address", ValueType.NUMBER, new Value(4)));
+			act.addParameter(new Parameter("Event Polling Interval", ValueType.NUMBER, new Value(5)));
+			act.addParameter(new Parameter("Static Polling Interval", ValueType.NUMBER, new Value(25)));
+			
+			Node anode = node.getChild("add ip outstation");
+			if (anode == null) node.createChild("add ip outstation").setAction(act).build().setSerializable(false);
+			else anode.setAction(act);
+		}
+		
+	}
+	
 	private void addOutstation(ActionResult event) {
 		String name = event.getParameter("Name", ValueType.STRING).getString();
 		boolean isSer = (event.getParameter("Host") == null);
@@ -112,7 +172,13 @@ public class DnpLink {
 		onode.setAttribute("Is Serial", new Value(isSer));
 		
 		if (isSer) {
-			String com = event.getParameter("COM Port", ValueType.STRING).getString();
+			String com;
+			Value customPort = event.getParameter("COM Port (manual entry)");
+			if (customPort != null && customPort.getString() != null && customPort.getString().trim().length() > 0) {
+				com = customPort.getString();
+			} else {
+				com = event.getParameter("COM Port").getString();
+			}
 			int baud = event.getParameter("Baud Rate", ValueType.NUMBER).getNumber().intValue();
 			int dbits = event.getParameter("Data Bits", ValueType.NUMBER).getNumber().intValue();
 			int sbits = event.getParameter("Stop Bits", ValueType.NUMBER).getNumber().intValue();

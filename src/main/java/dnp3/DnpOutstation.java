@@ -40,12 +40,14 @@ public class DnpOutstation {
 	private DnpLink link;
 	private Node node;
 	private DNPUser user;
+	private boolean isSerial;
 	
 	private Node ainode;
 	private Node binode;
 	private Node cinode;
 	private Node aonode;
 	private Node bonode;
+	
 	
 	private int pollsPerDiscover = 1;
 	private int pollsSinceLastDiscover = 0;
@@ -56,10 +58,12 @@ public class DnpOutstation {
 	DnpOutstation(DnpLink link, Node node) {
 		this.link = link;
 		this.node = node;
+		isSerial = node.getAttribute("Is Serial").getBool();
+		if (isSerial) link.serialOutstations.add(this);
 	}
 	
 	void init() {
-		boolean isSerial = node.getAttribute("Is Serial").getBool();
+		
 		int maddr = node.getAttribute("Master Address").getNumber().intValue();
 		int oaddr = node.getAttribute("Outstation Address").getNumber().intValue();
 		
@@ -130,6 +134,7 @@ public class DnpOutstation {
 		stop();
 		node.clearChildren();
 		node.getParent().removeChild(node);
+		link.serialOutstations.remove(this);
 	}
 	
 	private void stop() {
@@ -142,20 +147,31 @@ public class DnpOutstation {
 		}
 	}
 	
-	private void makeEditAction() {
+	void makeEditAction() {
 		Action act = new Action(Permission.READ, new Handler<ActionResult>() {
 			public void handle(ActionResult event) {
 				edit(event);
 			}
 		});
-		boolean isSerial = node.getAttribute("Is Serial").getBool();
+
 		act.addParameter(new Parameter("Name", ValueType.STRING, new Value(node.getName())));
 		if (isSerial) {
-			act.addParameter(new Parameter("COM Port", ValueType.STRING, new Value("COM3")));
-			act.addParameter(new Parameter("Baud Rate", ValueType.NUMBER, new Value(9600)));
-			act.addParameter(new Parameter("Data Bits", ValueType.NUMBER, new Value(8)));
-			act.addParameter(new Parameter("Stop Bits", ValueType.NUMBER, new Value(1)));
-			act.addParameter(new Parameter("Parity", ValueType.NUMBER, new Value(0)));
+			Set<String> portids = link.getCOMPorts();
+			if (portids.size() > 0) {
+				if (portids.contains(node.getAttribute("COM Port").getString())) {
+					act.addParameter(new Parameter("COM Port", ValueType.makeEnum(portids), node.getAttribute("COM Port")));
+					act.addParameter(new Parameter("COM Port (manual entry)", ValueType.STRING));
+				} else {
+					act.addParameter(new Parameter("COM Port", ValueType.makeEnum(portids)));
+					act.addParameter(new Parameter("COM Port (manual entry)", ValueType.STRING, node.getAttribute("COM Port")));
+				}
+			} else {
+				act.addParameter(new Parameter("COM Port", ValueType.STRING, node.getAttribute("COM Port")));
+			}
+			act.addParameter(new Parameter("Baud Rate", ValueType.NUMBER, node.getAttribute("Baud Rate")));
+			act.addParameter(new Parameter("Data Bits", ValueType.NUMBER, node.getAttribute("Data Bits")));
+			act.addParameter(new Parameter("Stop Bits", ValueType.NUMBER, node.getAttribute("Stop Bits")));
+			act.addParameter(new Parameter("Parity", ValueType.NUMBER, node.getAttribute("Parity")));
 		} else {
 			act.addParameter(new Parameter("Host", ValueType.STRING, node.getAttribute("Host")));
 			act.addParameter(new Parameter("Port", ValueType.NUMBER, node.getAttribute("Port")));
@@ -173,10 +189,15 @@ public class DnpOutstation {
 	
 	private void edit(ActionResult event) {
 		String name = event.getParameter("Name", ValueType.STRING).getString();
-		boolean isSerial = node.getAttribute("Is Serial").getBool();
 		
 		if (isSerial) {
-			String com = event.getParameter("COM Port", ValueType.STRING).getString();
+			String com;
+			Value customPort = event.getParameter("COM Port (manual entry)");
+			if (customPort != null && customPort.getString() != null && customPort.getString().trim().length() > 0) {
+				com = customPort.getString();
+			} else {
+				com = event.getParameter("COM Port").getString();
+			}
 			int baud = event.getParameter("Baud Rate", ValueType.NUMBER).getNumber().intValue();
 			int dbits = event.getParameter("Data Bits", ValueType.NUMBER).getNumber().intValue();
 			int sbits = event.getParameter("Stop Bits", ValueType.NUMBER).getNumber().intValue();

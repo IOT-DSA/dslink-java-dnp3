@@ -349,7 +349,7 @@ public class DnpOutstation {
 	private void handleSet(DataType type, int index, Value val) {
 		Buffer cmd = null;
 		if (type == DataType.AO) {
-			cmd = user.buildAnalogControlCommand(AppFeatures.DIRECT_OPERATE, index, val.getNumber().intValue());
+			cmd = user.buildAnalogControlCommand(AppFeatures.DIRECT_OPERATE, index, val.getNumber().doubleValue());
 		} else if (type == DataType.BO) {
 			byte code = val.getBool().booleanValue() ? (byte) 1 : (byte) 0;
 			cmd = user.buildBinaryControlCommand(AppFeatures.DIRECT_OPERATE, index, code, 0, 0);

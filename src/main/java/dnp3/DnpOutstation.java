@@ -44,6 +44,7 @@ public class DnpOutstation {
 	
 	private Node ainode;
 	private Node binode;
+	private Node dinode;
 	private Node cinode;
 	private Node aonode;
 	private Node bonode;
@@ -299,6 +300,7 @@ public class DnpOutstation {
 	private void updateValues() {
 		Database db = user.getDatabase();
 		handleStaticData(DataType.BI, db.getBinaryInputPoints());
+		handleStaticData(DataType.DI, db.getDoubleInputPoints());
 		handleStaticData(DataType.AI, db.getAnalogInputPoints());
 		handleStaticData(DataType.CI, db.getCounterInputPoints());
 		handleStaticData(DataType.BO, db.getBinaryOutputPoints());
@@ -373,7 +375,7 @@ public class DnpOutstation {
 	}
 	
 	private enum DataType {
-		BI("Binary Input", 0x01), AI("Analog Input", 0x30), CI("Counter Input", 0x20), BO("Control Output", 0x10), AO("Analog Output", 0x40);
+		BI("Binary Input", 0x01), AI("Analog Input", 0x30), CI("Counter Input", 0x20), BO("Control Output", 0x10), AO("Analog Output", 0x40), DI("Double Input", 0x03);
 	
 		private String name;
 		private String nodeName;
@@ -395,6 +397,8 @@ public class DnpOutstation {
 			case 0x00:
 			case 0x01:
 				return BI;
+			case 0x03:
+				return DI;
 			case 0x10:
 				return BO;
 			case 0x20:
@@ -413,6 +417,8 @@ public class DnpOutstation {
 			case BI:
 			case BO:
 				return ValueType.BOOL;
+			case DI:
+				return ValueType.makeEnum("Intermediate", "Off", "On", "Indeterminate");
 			default:
 				return ValueType.NUMBER;
 			}
@@ -423,6 +429,8 @@ public class DnpOutstation {
 			case BI:
 			case BO:
 				return new Value(Boolean.parseBoolean(str));
+			case DI:
+				return new Value(str);
 			default:
 				return new Value(Double.parseDouble(str));
 			}
@@ -434,6 +442,10 @@ public class DnpOutstation {
 		case BI: {
 			if (binode == null) binode = node.createChild(type.nodeName).build();
 			return binode;
+		}
+		case DI: {
+			if (dinode == null) dinode = node.createChild(type.nodeName).build();
+			return dinode;
 		}
 		case AI: {
 			if (ainode == null) ainode = node.createChild(type.nodeName).build();

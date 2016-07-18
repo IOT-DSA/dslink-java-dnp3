@@ -260,19 +260,20 @@ public class DnpOutstation {
 		if (anode == null) node.createChild("discover").setAction(act).build().setSerializable(false);
 		else anode.setAction(act);
 		
-		act = new Action(Permission.READ, new Handler<ActionResult>() {
-			public void handle(ActionResult event) {
-				update();
-			}
-		});
-		anode = node.getChild("update");
-		if (anode == null) node.createChild("update").setAction(act).build().setSerializable(false);
-		else anode.setAction(act);
+//		act = new Action(Permission.READ, new Handler<ActionResult>() {
+//			public void handle(ActionResult event) {
+//				update();
+//			}
+//		});
+//		anode = node.getChild("update");
+//		if (anode == null) node.createChild("update").setAction(act).build().setSerializable(false);
+//		else anode.setAction(act);
 	}
 	
 	private void discover() {
 		
 		try {
+			LOGGER.debug("Sending Read Static Data Request");
 			user.sendSynch(user.buildReadStaticDataMsg());
 		} catch (Exception e) {
 			LOGGER.debug("", e);
@@ -486,6 +487,7 @@ public class DnpOutstation {
 			public void run() {
 				if (pollsSinceLastDiscover < pollsPerDiscover - 1) {
 					try {
+						LOGGER.debug("Sending Read Event Data Request");
 						user.sendSynch(user.buildReadEventDataMsg());
 					} catch (Exception e) {
 						LOGGER.debug("" ,e);

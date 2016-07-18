@@ -5,7 +5,7 @@ apply plugin: 'java'
 mainClassName = 'dnp3.Main'
 sourceCompatibility = 1.7
 targetCompatibility = 1.7
-version = '0.0.6-SNAPSHOT'
+version = '0.0.7-SNAPSHOT'
 
 repositories {
     mavenCentral()

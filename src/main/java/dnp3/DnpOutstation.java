@@ -42,6 +42,8 @@ public class DnpOutstation {
 	private DNPUser user;
 	private boolean isSerial;
 	
+	private Node statnode = null;
+	
 	private Node ainode;
 	private Node binode;
 	private Node dinode;
@@ -64,6 +66,12 @@ public class DnpOutstation {
 	}
 	
 	void init() {
+		
+		if (statnode == null) {
+			statnode = node.createChild("Status").setValueType(ValueType.STRING).setValue(new Value("Initializing")).build();
+		} else {
+			statnode.setValue(new Value("Initializing"));
+		}
 		
 		int maddr = node.getAttribute("Master Address").getNumber().intValue();
 		int oaddr = node.getAttribute("Outstation Address").getNumber().intValue();
@@ -89,7 +97,9 @@ public class DnpOutstation {
         user = new DNPUser(configuration);
         try {
 			user.init();
+			statnode.setValue(new Value("Connected"));
 		} catch (Exception e) {
+			statnode.setValue(new Value("Failed to Connect"));
 			LOGGER.debug("", e);
 		}
         
@@ -142,6 +152,7 @@ public class DnpOutstation {
 		if (user != null) {
 			try {
 				user.stop();
+				statnode.setValue(new Value("Stopped"));
 			} catch (Exception e) {
 				LOGGER.debug("", e);
 			} 
@@ -275,7 +286,9 @@ public class DnpOutstation {
 		try {
 			LOGGER.debug("Sending Read Static Data Request");
 			user.sendSynch(user.buildReadStaticDataMsg());
+			statnode.setValue(new Value("Connected"));
 		} catch (Exception e) {
+			statnode.setValue(new Value("Latest poll failed"));
 			LOGGER.debug("", e);
 		}
 		
@@ -489,7 +502,9 @@ public class DnpOutstation {
 					try {
 						LOGGER.debug("Sending Read Event Data Request");
 						user.sendSynch(user.buildReadEventDataMsg());
+						statnode.setValue(new Value("Connected"));
 					} catch (Exception e) {
+						statnode.setValue(new Value("Latest poll failed"));
 						LOGGER.debug("" ,e);
 					}
 					pollsSinceLastDiscover += 1;
